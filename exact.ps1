@@ -76,33 +76,35 @@ $webRoot = (Get-ChildItem (Join-Path $work "novnc") -Directory | Select-Object -
 Copy-Item (Join-Path $webRoot "vnc.html") (Join-Path $webRoot "index.html") -Force
 
 Write-Host "`n[3/4] Starting websockify on :6080..." -ForegroundColor Cyan
-$wsLog = Join-Path $work "websockify.log"
+$wsOutLog = Join-Path $work "websockify.out.log"
+$wsErrLog = Join-Path $work "websockify.err.log"
 Start-Process -FilePath python `
     -ArgumentList "-m", "websockify", "--web", "`"$webRoot`"", "6080", "127.0.0.1:5900" `
-    -RedirectStandardOutput $wsLog -RedirectStandardError $wsLog -WindowStyle Hidden
+    -RedirectStandardOutput $wsOutLog -RedirectStandardError $wsErrLog -WindowStyle Hidden
 
 Start-Sleep -Seconds 3
 $novncUp = (Test-NetConnection -ComputerName 127.0.0.1 -Port 6080 -WarningAction SilentlyContinue).TcpTestSucceeded
-if (-not $novncUp) { throw "websockify isn't listening on :6080. Check $wsLog." }
+if (-not $novncUp) { throw "websockify isn't listening on :6080. Check $wsOutLog and $wsErrLog." }
 Write-Host "noVNC is up on :6080." -ForegroundColor Green
 
 Write-Host "`n[4/4] Opening Cloudflare quick tunnel..." -ForegroundColor Cyan
 $cfExe = Join-Path $work "cloudflared.exe"
 Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile $cfExe
-$cfLog = Join-Path $work "cloudflared.log"
+$cfOutLog = Join-Path $work "cloudflared.out.log"
+$cfErrLog = Join-Path $work "cloudflared.err.log"
 Start-Process -FilePath $cfExe `
     -ArgumentList "tunnel", "--url", "http://127.0.0.1:6080", "--no-autoupdate" `
-    -RedirectStandardOutput $cfLog -RedirectStandardError $cfLog -WindowStyle Hidden
+    -RedirectStandardOutput $cfOutLog -RedirectStandardError $cfErrLog -WindowStyle Hidden
 
 $tunnelUrl = $null
 for ($i = 0; $i -lt 40 -and -not $tunnelUrl; $i++) {
     Start-Sleep -Seconds 3
-    $logContent = Get-Content $cfLog -ErrorAction SilentlyContinue | Out-String
+    $logContent = (Get-Content $cfOutLog, $cfErrLog -ErrorAction SilentlyContinue) -join "`n"
     if ($logContent -match 'https://[a-z0-9-]+\.trycloudflare\.com') { $tunnelUrl = $Matches[0] }
 }
 
 if (-not $tunnelUrl) {
-    Get-Content $cfLog -ErrorAction SilentlyContinue
+    Get-Content $cfOutLog, $cfErrLog -ErrorAction SilentlyContinue
     throw "Couldn't find the tunnel URL in cloudflared's log (see above)."
 }
 
